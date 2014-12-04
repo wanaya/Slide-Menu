@@ -109,51 +109,76 @@ class NavViewController: UIViewController {
         }
     }
     
-    
     func movePanelLeft() {
-        
-        let childView = self.leftView()
-        self.view.sendSubviewToBack(childView)
-        var frame = self.centerViewController.view.frame
-        frame.origin.x = panelWidth
-        if var frameNav = self.navigationController?.navigationBar.frame {
-            self.posYNav = frameNav.origin.y
-            frameNav.origin.x = panelWidth
-            
-            UIView.animateWithDuration(slideTiming, delay: Double(0), options: .BeginFromCurrentState, animations:{
-                self.centerViewController.view.frame = frame
-                self.navigationController?.navigationBar.frame = frameNav
-                
-                }, completion: {
-                    finished in
-                    if finished {
-                        self.menuState = SSlideMenuState.LeftOpened
-                    }
-            })
+        if self.menuState != SSlideMenuState.LeftOpened {
+            self.addLeftToView()
         }
+        
+        self.movePanelLeft(shouldExpand: true)
+    }
+    
+    func movePanelRight() {
+        if self.menuState != SSlideMenuState.RightOpened {
+            self.addRightToview()
+        }
+        
+        self.movePanelRight(shouldExpand: true)
+    }
+    
+    func movePanelLeft(#shouldExpand: Bool) {
+        
+        if shouldExpand {
+            var frame = self.centerViewController.view.frame
+            frame.origin.x = panelWidth
+            if var frameNav = self.navigationController?.navigationBar.frame {
+                self.posYNav = frameNav.origin.y
+                frameNav.origin.x = panelWidth
+                
+                UIView.animateWithDuration(slideTiming, delay: Double(0), options: .BeginFromCurrentState, animations:{
+                    self.centerViewController.view.frame = frame
+                    self.navigationController?.navigationBar.frame = frameNav
+                    
+                    }, completion: {
+                        finished in
+                        if finished {
+                            self.menuState = SSlideMenuState.LeftOpened
+                        }
+                })
+            }
+        }else{
+            self.movePanelToOriginalPosition()
+        }
+        
+        
     }
     
     
-    func movePanelRight() {
-        let childView = self.rightView()
-        self.view.sendSubviewToBack(childView)
-        var frame = self.centerViewController.view.frame
-        frame.origin.x = -panelWidth
-        if var frameNav = self.navigationController?.navigationBar.frame {
-            self.posYNav = frameNav.origin.y
-            frameNav.origin.x = -panelWidth
-            
-            UIView.animateWithDuration(slideTiming, delay: Double(0), options: .BeginFromCurrentState, animations:{
-                self.centerViewController.view.frame = frame
-                self.navigationController?.navigationBar.frame = frameNav
+    func movePanelRight(#shouldExpand: Bool) {
+        
+        if shouldExpand {
+            var frame = self.centerViewController.view.frame
+            frame.origin.x = -panelWidth
+            if var frameNav = self.navigationController?.navigationBar.frame {
+                self.posYNav = frameNav.origin.y
+                frameNav.origin.x = -panelWidth
                 
-                }, completion: {
-                    finished in
-                    if finished {
-                        self.menuState = SSlideMenuState.RightOpened
-                    }
-            })
+                UIView.animateWithDuration(slideTiming, delay: Double(0), options: .BeginFromCurrentState, animations:{
+                    self.centerViewController.view.frame = frame
+                    self.navigationController?.navigationBar.frame = frameNav
+                    
+                    }, completion: {
+                        finished in
+                        if finished {
+                            self.menuState = SSlideMenuState.RightOpened
+                        }
+                })
+            }
+        }else{
+            
+            self.movePanelToOriginalPosition()
+            
         }
+        
         
     }
     
@@ -164,7 +189,6 @@ class NavViewController: UIViewController {
         
         if var frameNav = self.navigationController?.navigationBar.frame {
             frameNav.origin.x = 0
-            frameNav.origin.y = self.posYNav
             
             UIView.animateWithDuration(slideTiming, delay: Double(0), options: .BeginFromCurrentState, animations:{
                 self.centerViewController.view.frame = frame
@@ -193,6 +217,8 @@ class NavViewController: UIViewController {
         
         self.leftPanelViewController.view.removeFromSuperview()
         self.rightPanelViewController.view.removeFromSuperview()
+        
+        
     }
     
     func setupGestures() {
@@ -201,6 +227,21 @@ class NavViewController: UIViewController {
         self.panRecognizer.maximumNumberOfTouches = 1
         self.panRecognizer.delegate = self
         self.centerViewController.view.addGestureRecognizer(panRecognizer)
+        
+        
+    }
+    
+    func addLeftToView() {
+        let childView = self.leftView()
+        self.view.sendSubviewToBack(childView)
+        self.panningState = SPaningState.Right
+    }
+    
+    
+    func addRightToview() {
+        let childView = self.rightView()
+        self.view.sendSubviewToBack(childView)
+        self.panningState = SPaningState.Left
     }
 
 }
@@ -218,57 +259,44 @@ extension NavViewController: SlideProtocolDelegate {
 extension NavViewController: UIGestureRecognizerDelegate {
     func movePanel(tap: UIPanGestureRecognizer) {
         
-        var panStartPosition = CGPoint(x: 0, y: 0)
-        var panningView = tap.view
-        
-        if self.menuState != SSlideMenuState.Closed {
-            panningView = panningView?.superview
-        }
-        
-        let translation = tap.translationInView(panningView!)
+        let gestureIsDraggingFromLeftToRight = (tap.velocityInView(view).x > 0)
         
         switch tap.state {
         case .Began:
-            panStartPosition = tap.locationInView(panningView)
             panStarted = true
-        case .Ended, .Cancelled:
             
-            
-            self.panningState = SPaningState.Stopped
-        case .Changed:
-            
-            if panStartPosition == CGPoint(x: 0, y: 0) {
-                let actualWidth = panningView?.frame.size.width
-                if panStartPosition.x > actualWidth && panStartPosition.x < panningView!.frame.size.width - actualWidth! && self.menuState == SSlideMenuState.Closed {
-                    return
+            //--
+            if self.menuState == SSlideMenuState.Closed {
+                if gestureIsDraggingFromLeftToRight {
+                    self.addLeftToView()
+                }else{
+                    self.addRightToview()
                 }
             }
             
+            
+        case .Ended, .Cancelled:
             if self.panStarted {
                 self.panStarted = false
-                if panningView!.frame.origin.x + translation.x > 0 {
-                    switch self.menuState {
-                    case .RightOpened:
-                        self.movePanelToOriginalPosition()
-                    case .Closed:
-                        self.movePanelLeft()
-                    default:
-                        println("error")
-                        
-                    }
-                    self.panningState = SPaningState.Right
-                } else if panningView!.frame.origin.x + translation.x < 0 {
-                    switch self.menuState {
-                    case .LeftOpened:
-                        self.movePanelToOriginalPosition()
-                    case .Closed:
-                        self.movePanelRight()
-                    default:
-                        println("error")
-                    }
-                    self.panningState = SPaningState.Left
+                
+                switch self.panningState {
+                case .Right:
+                    let hasMovedGreaterThanHalfway = tap.view!.center.x > view.bounds.size.width
+                    self.movePanelLeft(shouldExpand: hasMovedGreaterThanHalfway)
+                case .Left:
+                    let hasMovedGreaterThanHalfwayRight = tap.view!.center.x < 0
+                    self.movePanelRight(shouldExpand: hasMovedGreaterThanHalfwayRight)
+                default:
+                    println("error")
                 }
             }
+            
+        case .Changed:
+            tap.view!.center.x = tap.view!.center.x + tap.translationInView(view).x
+            tap.setTranslation(CGPointZero, inView: view)
+            
+            self.navigationController!.navigationBar.center.x = tap.view!.center.x + tap.translationInView(view).x
+            
         default:
             println("\(tap.state)")
             
